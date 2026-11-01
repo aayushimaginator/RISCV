@@ -1,0 +1,15 @@
+vivado_phase0/
+.Xil/
+*.jou
+*.log
+*.str
+*.vvp
+*.vcd
+firmware/*.elf
+firmware/*.bin
+firmware/*.hex
+rtl/firmware.hex
+/reports/
+
+docs/ref/
+firmware/.delay_*.stamp
