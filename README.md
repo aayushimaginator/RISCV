@@ -23,7 +23,7 @@ Reports are in docs/reports/.
 - 0x1000_0008 UART status (bit 0 = busy)
 
 ## Build
-    git clone --recursive <repo-url>
+    git clone --recursive https://github.com/aayushimaginator/RISCV.git
     make -C firmware DELAY_N=20
     iverilog -o soc_tb.vvp tb/soc_tb.v rtl/soc_top.v rtl/ram_lutram.v rtl/uart_tx.v third_party/picorv32/picorv32.v
     vvp soc_tb.vvp
