@@ -1,4 +1,4 @@
-# urbana-rv32i
+# Urbana implementation of RV32I
 
 RV32I CPU project on the RealDigital Urbana (Spartan-7 XC7S50, speed grade -2), for an MPMC course.
 
