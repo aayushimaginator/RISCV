@@ -14,3 +14,4 @@ rtl/firmware.hex
 docs/ref/
 firmware/.delay_*.stamp
 tb/immgen_vectors.hex
+tb/decoder_vectors.hex
