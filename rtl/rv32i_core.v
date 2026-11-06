@@ -65,6 +65,8 @@ module rv32i_core #(
     // Register file signals
     // -------------------------------------------------------------------------
 
+    wire [31:0] instr = imem_rdata;
+
     wire [4:0]  rs1_addr = instr[19:15];
     wire [4:0]  rs2_addr = instr[24:20];
     wire [4:0]  rd_addr  = instr[11:7];
@@ -111,7 +113,6 @@ module rv32i_core #(
 
     assign imem_addr = pc;
 
-    wire [31:0] instr = imem_rdata;
 
     // -------------------------------------------------------------------------
     // Module instantiations
