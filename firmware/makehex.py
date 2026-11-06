@@ -17,12 +17,12 @@ def main():
         print(f"ERROR: firmware is {len(data)} bytes, exceeds 8192 bytes", file=sys.stderr)
         return 1
 
-    if (len(data) % 4) != 0:
-        pad = 4 - (len(data) % 4)
-        data = data + b"\x00" * pad
+    # Pad to exactly 8192 bytes (2048 words) to prevent Icarus $readmemh 
+    # from leaving trailing words as 'x'
+    if len(data) < 8192:
+        data = data + b"\x00" * (8192 - len(data))
 
     words = []
-
     for i in range(0, len(data), 4):
         w = (
             data[i + 0]
