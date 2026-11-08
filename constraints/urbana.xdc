@@ -1,5 +1,5 @@
 set_property -dict {PACKAGE_PIN N15 IOSTANDARD LVCMOS33} [get_ports clk_100mhz]
-create_clock -add -name gclk -period 20.000 -waveform {0 5} [get_ports clk_100mhz]
+create_clock -add -name gclk -period 10.000 -waveform {0 5} [get_ports clk_100mhz]
 set_property CFGBVS VCCO [current_design]
 set_property CONFIG_VOLTAGE 3.3 [current_design]
 set_property -dict {PACKAGE_PIN C13 IOSTANDARD LVCMOS33} [get_ports {led[0]}]

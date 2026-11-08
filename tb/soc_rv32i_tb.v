@@ -15,7 +15,7 @@ module soc_tb;
 
     soc_top_rv32i #(
         .RST_ACTIVE_HIGH (1),
-        .UART_DIVISOR    (BIT_CYCLES),
+        .UART_DIVISOR    (BIT_CYCLES/2),
         .LED_W           (16),
         .MEM_FILE        ("firmware/firmware.hex")
     ) dut (
