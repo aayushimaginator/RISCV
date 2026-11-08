@@ -52,3 +52,8 @@ branch resolution and forwarding in one stage, so the critical path is not short
 earlier commit claimed 100 MHz from a 20 ns constraint on a 100 MHz pin; that was wrong
 and is corrected here with a real MMCM-derived clock.
 Code was written with LLM assistance and independently verified.
+
+### Compliance
+- riscv-tests rv32ui: 40/40 pass (minimal ECALL-terminated env in `tests/rvtest_env`; `fence_i` and `ma_data` skipped as out of scope). Each result also agrees with the Python ISS.
+- CPI on that suite: about 1.07 (short tests, includes pipeline fill).
+- Run: `tools/run_riscv_tests.sh`
