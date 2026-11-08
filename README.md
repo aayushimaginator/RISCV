@@ -57,3 +57,20 @@ Code was written with LLM assistance and independently verified.
 - riscv-tests rv32ui: 40/40 pass (minimal ECALL-terminated env in `tests/rvtest_env`; `fence_i` and `ma_data` skipped as out of scope). Each result also agrees with the Python ISS.
 - CPI on that suite: about 1.07 (short tests, includes pipeline fill).
 - Run: `tools/run_riscv_tests.sh`
+
+## Phase 2: 4-stage core (IF | EX | MEM | WB), 75 MHz
+
+| Item | Result |
+|---|---|
+| Clock | 100 MHz pin -> MMCM -> 75 MHz system clock (13.33 ns) |
+| Setup / hold slack | WNS +1.427 ns / WHS +0.048 ns (post-route, Vivado 2024.2) |
+| Critical path | 11.9 ns: instruction reg -> decode/immgen -> ALU adder (JALR target) -> next PC |
+| Estimated Fmax | about 84 MHz |
+| Verification | unit tests; 200/200 random programs vs ISS; riscv-tests rv32ui 40/40; SoC sim PASS |
+| CPI | about 1.08 on rv32ui (short tests, includes pipeline fill) |
+| Board test | **pending** |
+
+Change from Phase 1: load data is registered at the end of MEM and forwarded from the WB
+register, so the data-RAM read no longer sits in the branch-resolve path. One stall cycle on
+load-use. UART divisor 651 for 75 MHz is not exercised by the simulation (the testbench
+overrides it and uses a /2 clock), so it is only verified by arithmetic until the board test.
