@@ -85,7 +85,7 @@ module rv32i_core_tb;
         $fwrite(fd, "x0 00000000\n");
         for (i = 1; i < 32; i = i + 1)
             $fwrite(fd, "x%0d %08x\n", i, dut.u_regfile.rf[i]);
-        $fwrite(fd, "pc %08x\n", dut.halted ? dut.if_id_pc : dut.pc);
+        $fwrite(fd, "pc %08x\n", dut.halted ? dut.if_ex_pc : dut.pc);
         $fwrite(fd, "cycles %0d\n", cycle_count);
         for (i = 0; i < 2048; i = i + 1)
             $fwrite(fd, "m%04x %08x\n", i, mem[i]);
