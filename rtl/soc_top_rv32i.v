@@ -11,7 +11,7 @@
 
 module soc_top_rv32i #(
     parameter RST_ACTIVE_HIGH = 1,
-    parameter UART_DIVISOR    = 434,
+    parameter UART_DIVISOR    = 651,
     parameter LED_W           = 16,
     parameter MEM_FILE        = "firmware.hex"
 ) (
@@ -25,13 +25,13 @@ module soc_top_rv32i #(
     // Reset synchronization and hold
     // -------------------------------------------------------------------------
 
-    // 100 MHz pin -> 50 MHz system clock (MMCM in synthesis, /2 toggle in sim)
+    // 100 MHz pin -> 75 MHz system clock (MMCM in synthesis, /2 toggle in sim)
     wire clk_sys, clk_locked;
 `ifdef SYNTHESIS
     wire clk_fb, clk_mmcm;
     MMCME2_BASE #(
         .CLKIN1_PERIOD(10.0), .DIVCLK_DIVIDE(1),
-        .CLKFBOUT_MULT_F(10.0), .CLKOUT0_DIVIDE_F(20.0)
+        .CLKFBOUT_MULT_F(7.5), .CLKOUT0_DIVIDE_F(10.0)
     ) u_mmcm (
         .CLKIN1(clk_100mhz), .CLKFBIN(clk_fb), .CLKFBOUT(clk_fb),
         .CLKOUT0(clk_mmcm), .LOCKED(clk_locked), .PWRDWN(1'b0), .RST(1'b0)
