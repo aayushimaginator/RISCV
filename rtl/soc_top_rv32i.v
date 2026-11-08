@@ -11,7 +11,7 @@
 
 module soc_top_rv32i #(
     parameter RST_ACTIVE_HIGH = 1,
-    parameter UART_DIVISOR    = 868,
+    parameter UART_DIVISOR    = 434,
     parameter LED_W           = 16,
     parameter MEM_FILE        = "firmware.hex"
 ) (
@@ -25,7 +25,26 @@ module soc_top_rv32i #(
     // Reset synchronization and hold
     // -------------------------------------------------------------------------
 
-    wire rst_async = RST_ACTIVE_HIGH ? rst_btn : ~rst_btn;
+    // 100 MHz pin -> 50 MHz system clock (MMCM in synthesis, /2 toggle in sim)
+    wire clk_sys, clk_locked;
+`ifdef SYNTHESIS
+    wire clk_fb, clk_mmcm;
+    MMCME2_BASE #(
+        .CLKIN1_PERIOD(10.0), .DIVCLK_DIVIDE(1),
+        .CLKFBOUT_MULT_F(10.0), .CLKOUT0_DIVIDE_F(20.0)
+    ) u_mmcm (
+        .CLKIN1(clk_100mhz), .CLKFBIN(clk_fb), .CLKFBOUT(clk_fb),
+        .CLKOUT0(clk_mmcm), .LOCKED(clk_locked), .PWRDWN(1'b0), .RST(1'b0)
+    );
+    BUFG u_bufg (.I(clk_mmcm), .O(clk_sys));
+`else
+    reg clk_div = 1'b0;
+    always @(posedge clk_100mhz) clk_div <= ~clk_div;
+    assign clk_sys    = clk_div;
+    assign clk_locked = 1'b1;
+`endif
+
+    wire rst_async = (RST_ACTIVE_HIGH ? rst_btn : ~rst_btn) | ~clk_locked;
 
     (* async_reg = "true" *)
     reg [2:0] rst_sync;
@@ -34,7 +53,7 @@ module soc_top_rv32i #(
         rst_sync = 3'b000;
     end
 
-    always @(posedge clk_100mhz) begin
+    always @(posedge clk_sys) begin
         rst_sync <= {rst_sync[1:0], rst_async};
     end
 
@@ -46,7 +65,7 @@ module soc_top_rv32i #(
         rst_hold = 8'hFF;
     end
 
-    always @(posedge clk_100mhz) begin
+    always @(posedge clk_sys) begin
         if (rst_synced) begin
             rst_hold <= 8'hFF;
         end
@@ -80,7 +99,7 @@ module soc_top_rv32i #(
     rv32i_core #(
         .RESET_PC (32'h0000_0000)
     ) u_core (
-        .clk        (clk_100mhz),
+        .clk        (clk_sys),
         .resetn     (resetn),
 
         .imem_addr  (imem_addr),
@@ -127,7 +146,7 @@ module soc_top_rv32i #(
     ram_lutram #(
         .INIT_FILE (MEM_FILE)
     ) u_ram (
-        .clk     (clk_100mhz),
+        .clk     (clk_sys),
         .we      (ram_we),
         .wstrb   (ram_wstrb),
         .addr    (dmem_addr),
@@ -150,7 +169,7 @@ module soc_top_rv32i #(
 
     wire led_we = io_led && (|dmem_wstrb);
 
-    always @(posedge clk_100mhz) begin
+    always @(posedge clk_sys) begin
         if (reset_active) begin
             led_reg <= 32'h0000_0000;
         end
@@ -182,7 +201,7 @@ module soc_top_rv32i #(
     uart_tx #(
         .DIVISOR (UART_DIVISOR)
     ) u_uart_tx (
-        .clk   (clk_100mhz),
+        .clk   (clk_sys),
         .reset (reset_active),
         .start (uart_start),
         .data  (dmem_wdata[7:0]),
