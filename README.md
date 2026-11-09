@@ -79,3 +79,25 @@ overrides it and uses a /2 clock), so it is only verified by arithmetic until th
 - One micro-USB cable into `PROG UART USB PWR` (J13) powers, programs and carries the UART (FT2232H, UART on the second ttyUSB, 115200 8N1). The USB-C port is external power only.
 - Jumper `PWR SEL` on `USB`, power switch `SW16` on `ON`; all four POWER SUPPLY STATUS LEDs light.
 - Control experiment first: PicoRV32 bitstream (`scripts/program.tcl`), then own core (`-tclargs <bitstream>`). Same firmware, same expected output.
+
+## On-board known-answer self-test
+
+`firmware/selftest.c` runs 55 checks on the 4-stage core at 75 MHz and prints each result over UART. The expected values are computed independently in Python (`tools/check_selftest.py`, using zlib for CRC32), not by the firmware itself.
+
+Coverage: CRC-32 (bitwise), Fibonacci (iterative and recursive), bubble sort, add/sub wraparound, all shift forms, XOR/OR/AND, signed and unsigned compares, all branch types, lb/lbu/lh/lhu/sb/sh with sign extension and partial-word writes, and indirect calls through a function-pointer table (jalr). Instructions the compiler would otherwise rewrite (lb, lh, blt, bge, slti, sltiu) are forced with inline asm so they really execute.
+
+Result on the Urbana board: all 55 checks PASS and the LEDs show 0xAAAA. The same image also passes in simulation (`tools/run_selftest.sh`). Timing for this bitstream: WNS +1.427 ns, WHS +0.048 ns, 0 failing endpoints.
+
+![UART output](docs/media/selftest_uart.png)
+![LEDs 0xAAAA](docs/media/selftest_leds.jpg)
+
+## On-board known-answer self-test
+
+`firmware/selftest.c` runs 55 checks on the 4-stage core at 75 MHz and prints each result over UART. The expected values are computed independently in Python (`tools/check_selftest.py`, using zlib for CRC32), not by the firmware itself.
+
+Coverage: CRC-32 (bitwise), Fibonacci (iterative and recursive), bubble sort, add/sub wraparound, all shift forms, XOR/OR/AND, signed and unsigned compares, all branch types, lb/lbu/lh/lhu/sb/sh with sign extension and partial-word writes, and indirect calls through a function-pointer table (jalr). Instructions the compiler would otherwise rewrite (lb, lh, blt, bge, slti, sltiu) are forced with inline asm so they really execute.
+
+Result on the Urbana board: all 55 checks PASS and the LEDs show 0xAAAA. The same image also passes in simulation (`tools/run_selftest.sh`). Timing for this bitstream: WNS +1.427 ns, WHS +0.048 ns, 0 failing endpoints.
+
+![UART output](docs/media/selftest_uart.png)
+![LEDs 0xAAAA](docs/media/selftest_leds.jpg)
