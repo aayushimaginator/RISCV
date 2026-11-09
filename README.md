@@ -3,7 +3,7 @@
 RV32I CPU project on the RealDigital Urbana (Spartan-7 XC7S50, speed grade -2), for an MPMC course.
 
 ## Status
-- Phase 0: SoC around unmodified PicoRV32 (UART + 16 LEDs). Simulation PASS, Vivado timing met at 100 MHz. **Board test pending.**
+- Phase 0: SoC around unmodified PicoRV32 (UART + 16 LEDs). Simulation PASS, Vivado timing met at 100 MHz. **Board test: verified on Urbana (UART greeting + LED sweep).**
 - Phase 1: own single-cycle RV32I core, in progress (ALU and branch comparator first).
 
 ## Phase 0 results (Vivado 2024.2, post-implementation, 100 MHz)
@@ -45,7 +45,7 @@ MIT for this repo's own code. third_party/picorv32 is ISC (YosysHQ).
 | Critical path | 17.6 ns: data-RAM read -> LSU -> forwarding -> branch compare -> next PC |
 | Real Fmax | about 56 MHz (not 100 MHz) |
 | Verification | 7 unit tests; 50/50 random programs match a Python ISS; SoC sim PASS |
-| Board test | **pending** (not yet run on hardware) |
+| Board test | superseded by Phase 2 (never run on hardware) |
 
 History: the single-cycle core failed 100 MHz (WNS -7.07 ns). The 2-stage version keeps
 branch resolution and forwarding in one stage, so the critical path is not shorter. An
@@ -68,9 +68,14 @@ Code was written with LLM assistance and independently verified.
 | Estimated Fmax | about 84 MHz |
 | Verification | unit tests; 200/200 random programs vs ISS; riscv-tests rv32ui 40/40; SoC sim PASS |
 | CPI | about 1.08 on rv32ui (short tests, includes pipeline fill) |
-| Board test | **pending** |
+| Board test | **verified on Urbana**: bitstream at 75 MHz prints `Hello, RV32I!` on UART and runs the LED sweep, about 2.8x faster than the PicoRV32 control on the same firmware |
 
 Change from Phase 1: load data is registered at the end of MEM and forwarded from the WB
 register, so the data-RAM read no longer sits in the branch-resolve path. One stall cycle on
 load-use. UART divisor 651 for 75 MHz is not exercised by the simulation (the testbench
 overrides it and uses a /2 clock), so it is only verified by arithmetic until the board test.
+
+### Hardware bring-up notes (Urbana)
+- One micro-USB cable into `PROG UART USB PWR` (J13) powers, programs and carries the UART (FT2232H, UART on the second ttyUSB, 115200 8N1). The USB-C port is external power only.
+- Jumper `PWR SEL` on `USB`, power switch `SW16` on `ON`; all four POWER SUPPLY STATUS LEDs light.
+- Control experiment first: PicoRV32 bitstream (`scripts/program.tcl`), then own core (`-tclargs <bitstream>`). Same firmware, same expected output.
