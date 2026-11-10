@@ -100,3 +100,11 @@ Verification: a unit testbench (`tb/seg7_tb.v`), an SoC-level test where the rea
 On the board, firmware writes `0xCBF43926`, the CRC-32 of `123456789`, and the displays read `CbF4.3926`, with the decimal point after digit 4. Timing for this bitstream: WNS +2.113 ns, WHS +0.077 ns, 0 failing endpoints at 75 MHz. The physical digit order was found on hardware: the first build showed the digits reversed, and the digit map was reversed to fix it.
 
 ![Display showing CbF4.3926](docs/media/seg7_crc.jpg)
+
+## Cycle counter and hardware multiplier
+
+The SoC has a free-running 32-bit cycle counter at 0x10000014 and a memory-mapped multiplier (rtl/mul32.v) at 0x10000020 to 0x10000030: operands A and B, 64-bit result LO and HI, and a busy flag. RV32I has no multiply instruction, so software multiplies use a shift-and-add loop. The multiplier is a two-stage pipeline of four 16x16 products that Vivado maps onto DSP48 slices, and it is not an ISA extension, so the CPU pipeline is untouched.
+
+firmware/mulbench.c first checks 12 known-answer products against values computed in Python, then times 100 multiplies in software against 100 through the peripheral, using the cycle counter. Measured in simulation of the same image: 26904 cycles in software against 2111 through the peripheral, a speedup of 12.7x. On the board the display shows the speedup times 10 as 0000012.7. Timing for this bitstream at 75 MHz: WNS 1.275 ns, WHS 0.082 ns, no failing endpoints.
+
+![Display showing 12.7x speedup](docs/media/mulbench_speedup.jpg)
