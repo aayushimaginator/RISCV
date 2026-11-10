@@ -108,3 +108,11 @@ The SoC has a free-running 32-bit cycle counter at 0x10000014 and a memory-mappe
 firmware/mulbench.c first checks 12 known-answer products against values computed in Python, then times 100 multiplies in software against 100 through the peripheral, using the cycle counter. Measured in simulation of the same image: 26904 cycles in software against 2111 through the peripheral, a speedup of 12.7x. On the board the display shows the speedup times 10 as 0000012.7. Timing for this bitstream at 75 MHz: WNS 1.275 ns, WHS 0.082 ns, no failing endpoints.
 
 ![Display showing 12.7x speedup](docs/media/mulbench_speedup.jpg)
+
+## Calculator readout: cos and sin on the display
+
+firmware/mathdisp.c sweeps an angle around the full circle in 15 degree steps and shows cos and sin on the eight-digit display, calculator style: the leftmost digit is the function (C for cos, 5 for sin), then the angle, then the value, for example C135 0.707. The display font has no minus sign, so a negative value also lights the decimal point after the angle. The values come from CORDIC in fixed point (shifts, adds and a small table, no multiplier) and are also printed over UART.
+
+Verification: tools/check_mathdisp.py runs the same code on the host and checks all 48 screens (digits, sign dot and value within 0.001) against Python's math library. On the board the UART output matches. The image is the same SoC as the multiplier build, so timing is unchanged at 75 MHz: WNS 1.275 ns, WHS 0.082 ns, no failing endpoints.
+
+[Video of the sweep on the board](docs/media/mathdisp_sweep.mp4)
