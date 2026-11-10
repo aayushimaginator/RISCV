@@ -14,14 +14,14 @@ module seg7_driver (
     localparam PHASE_CLKS = 18750;
 
     localparam [23:0] DIGIT_MAP = {
-        3'b111,
-        3'b110,
-        3'b101,
-        3'b100,
-        3'b011,
-        3'b010,
+        3'b000,
         3'b001,
-        3'b000
+        3'b010,
+        3'b011,
+        3'b100,
+        3'b101,
+        3'b110,
+        3'b111
     };
 
     function [2:0] digit_map;

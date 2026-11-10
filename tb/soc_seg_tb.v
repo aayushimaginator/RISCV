@@ -120,14 +120,14 @@ module soc_seg_tb;
         repeat (700000) @(posedge dut.clk_sys);
 
         for (g = 0; g < 8; g = g + 1) begin
-            if (got[g] !== {1'b1, EXPECT[4*g +: 4]}) begin
+            if (got[7-g] !== {1'b1, EXPECT[4*g +: 4]}) begin
                 errors = errors + 1;
                 $display("FAIL digit %0d got valid=%b nibble=%h expected %h",
-                         g, got[g][4], got[g][3:0], EXPECT[4*g +: 4]);
+                         g, got[7-g][4], got[7-g][3:0], EXPECT[4*g +: 4]);
             end
-            if (got_dp[g] !== (g == 4)) begin
+            if (got_dp[7-g] !== (g == 4)) begin
                 errors = errors + 1;
-                $display("FAIL dp digit %0d got %b", g, got_dp[g]);
+                $display("FAIL dp digit %0d got %b", g, got_dp[7-g]);
             end
         end
 

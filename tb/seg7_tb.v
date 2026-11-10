@@ -307,8 +307,8 @@ module seg7_tb;
 
         for (p = 0; p < 4; p = p + 1) begin
             phase_p  = p;
-            digit0_r = phase_p;
-            digit1_r = p + 4;
+            digit0_r = 3'd7 - phase_p;
+            digit1_r = 3'd3 - phase_p;
 
             wait_phase_active(phase_p);
 
