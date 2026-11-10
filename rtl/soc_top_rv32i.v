@@ -135,6 +135,12 @@ module soc_top_rv32i #(
     wire io_uart_status = io_region && (dmem_addr[11:0] == 12'h008);
     wire io_seg_data    = io_region && (dmem_addr[11:0] == 12'h00C);
     wire io_seg_dp      = io_region && (dmem_addr[11:0] == 12'h010);
+    wire io_cycle       = io_region && (dmem_addr[11:0] == 12'h014);
+    wire io_mul_a       = io_region && (dmem_addr[11:0] == 12'h020);
+    wire io_mul_b       = io_region && (dmem_addr[11:0] == 12'h024);
+    wire io_mul_lo      = io_region && (dmem_addr[11:0] == 12'h028);
+    wire io_mul_hi      = io_region && (dmem_addr[11:0] == 12'h02C);
+    wire io_mul_status  = io_region && (dmem_addr[11:0] == 12'h030);
 
     // -------------------------------------------------------------------------
     // RAM write control
@@ -265,6 +271,38 @@ module soc_top_rv32i #(
     );
 
     // -------------------------------------------------------------------------
+    // Cycle counter and multiplier peripheral
+    // -------------------------------------------------------------------------
+
+    reg [31:0] cycle_cnt;
+
+    initial begin
+        cycle_cnt = 32'h0000_0000;
+    end
+
+    always @(posedge clk_sys) begin
+        if (reset_active)
+            cycle_cnt <= 32'h0000_0000;
+        else
+            cycle_cnt <= cycle_cnt + 32'h0000_0001;
+    end
+
+    wire [31:0] mul_lo;
+    wire [31:0] mul_hi;
+    wire        mul_busy;
+
+    mul32 u_mul32 (
+        .clk   (clk_sys),
+        .rst   (reset_active),
+        .we_a  (io_mul_a && (|dmem_wstrb)),
+        .we_b  (io_mul_b && (|dmem_wstrb)),
+        .wdata (dmem_wdata),
+        .lo    (mul_lo),
+        .hi    (mul_hi),
+        .busy  (mul_busy)
+    );
+
+    // -------------------------------------------------------------------------
     // Data memory read mux
     // -------------------------------------------------------------------------
 
@@ -287,6 +325,18 @@ module soc_top_rv32i #(
         end
         else if (io_seg_dp) begin
             dmem_rdata_i = {24'h000000, seg_dp_reg};
+        end
+        else if (io_cycle) begin
+            dmem_rdata_i = cycle_cnt;
+        end
+        else if (io_mul_lo) begin
+            dmem_rdata_i = mul_lo;
+        end
+        else if (io_mul_hi) begin
+            dmem_rdata_i = mul_hi;
+        end
+        else if (io_mul_status) begin
+            dmem_rdata_i = {31'b0, mul_busy};
         end
         else begin
             dmem_rdata_i = 32'h0000_0000;

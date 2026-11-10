@@ -5,7 +5,7 @@ set rep  reports_rv32i
 
 set srcs {rtl/soc_top_rv32i.v rtl/rv32i_core.v rtl/rv32i_decoder.v rtl/rv32i_immgen.v
           rtl/rv32i_regfile.v rtl/rv32i_alu.v rtl/rv32i_branch_cmp.v rtl/rv32i_lsu.v
-          rtl/ram_lutram.v rtl/uart_tx.v rtl/seg7_driver.v}
+          rtl/ram_lutram.v rtl/uart_tx.v rtl/seg7_driver.v rtl/mul32.v}
 foreach f [concat $srcs {firmware/firmware.hex constraints/urbana.xdc}] {
     if {![file exists $f]} { error "$f missing" }
 }
