@@ -36,3 +36,4 @@ tests/*.bin
 reports_rv32i/
 vivado_rv32i/
 soc_sim.vvp
+*.docx

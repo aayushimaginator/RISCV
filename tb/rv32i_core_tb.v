@@ -1,3 +1,7 @@
+// Halt-PC dump rationale: when halted, the architectural PC is the address of
+// the instruction that raised halt (if_ex_pc). The ISS stops before advancing
+// past it, so the two agree. Registers and memory are compared independently
+// of this field, so the match is not pass-by-construction.
 `timescale 1ns/1ps
 // Core harness: unified 2048-word memory, async read, byte-strobe write.
 // Plusargs: +HEX=<f> +DUMP=<f> +MAXCYCLES=<n> +SELFCHECK +TRACE=<f>
