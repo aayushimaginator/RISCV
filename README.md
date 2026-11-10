@@ -90,3 +90,13 @@ Result on the Urbana board: all 55 checks PASS and the LEDs show 0xAAAA. The sam
 
 ![UART output](docs/media/selftest_uart.png)
 ![LEDs 0xAAAA](docs/media/selftest_leds.jpg)
+
+## Seven-segment display peripheral
+
+`rtl/seg7_driver.v` drives the Urbana's two 4-digit common-anode displays (8 digits, all signals active low). Two registers are memory-mapped: `SEG_DATA` at `0x1000000C` (8 hex nibbles, nibble 0 is the rightmost digit) and `SEG_DP` at `0x10000010` (decimal-point mask). The two displays have separate cathode buses, so the driver lights one digit on each display at the same time in four phases, about 1 kHz per frame, with an idle clock between phases to prevent ghosting.
+
+Verification: a unit testbench (`tb/seg7_tb.v`), an SoC-level test where the real CPU writes the register and a testbench decodes the pins like a display would (`tb/soc_seg_tb.v`), and the board. Run `tools/run_seg7.sh` for the simulation gates.
+
+On the board, firmware writes `0xCBF43926`, the CRC-32 of `123456789`, and the displays read `CbF4.3926`, with the decimal point after digit 4. Timing for this bitstream: WNS +2.113 ns, WHS +0.077 ns, 0 failing endpoints at 75 MHz. The physical digit order was found on hardware: the first build showed the digits reversed, and the digit map was reversed to fix it.
+
+![Display showing CbF4.3926](docs/media/seg7_crc.jpg)
