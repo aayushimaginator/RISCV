@@ -1,5 +1,9 @@
 `timescale 1ns/1ps
 
+`ifndef HEXFILE
+`define HEXFILE "build/selftest/selftest.hex"
+`endif
+
 module soc_selftest_tb;
 
     localparam CLK_PERIOD   = 10;
@@ -17,7 +21,7 @@ module soc_selftest_tb;
         .RST_ACTIVE_HIGH (1),
         .UART_DIVISOR    (UART_DIV),
         .LED_W           (16),
-        .MEM_FILE        ("build/selftest/selftest.hex")
+        .MEM_FILE        (`HEXFILE)
     ) dut (
         .clk_100mhz (clk),
         .rst_btn    (rst_btn),
