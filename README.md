@@ -137,3 +137,16 @@ Verification: `tools/run_cpi.sh` (sim gate against the theory table in
 `tools/check_cpi.py`), then on the Urbana board `tools/check_cpi.py --log
 build/cpi/hw.log --compare build/cpi/sim.log` reports the sim and board cycle
 counts identical. Timing for this image: WNS +1.275 ns at 75 MHz.
+
+## All-LEDs sanity image
+
+`firmware/allleds.c` writes `0xFFFF` to the LED register to drive all 16 LEDs
+solid on, complementing the `0xAAAA` alternating beacon used by the self-test
+and CPI images (which only proved alternating bits). It is a hardware-only
+peripheral sanity check and deliberately has no simulation gate: the shared SoC
+testbench `tb/soc_selftest_tb.v` keys its PASS condition on the `0xAAAA` beacon,
+so a full-on pattern would report TIMEOUT there without indicating a fault.
+Verified on the Urbana board: UART prints `ALL LEDS ON` and all 16 LEDs lit.
+The netlist is identical to the CPI image (only the RAM init content differs,
+which does not affect logic timing), so post-route timing is unchanged; the
+snapshot is in `docs/reports/allleds/`.
