@@ -18,7 +18,11 @@ module soc_top_rv32i #(
     input  wire        clk_100mhz,
     input  wire        rst_btn,
     output wire [15:0] led,
-    output wire        uart_txd
+    output wire        uart_txd,
+    output wire [3:0]  d0_an,
+    output wire [7:0]  d0_seg,
+    output wire [3:0]  d1_an,
+    output wire [7:0]  d1_seg
 );
 
     // -------------------------------------------------------------------------
@@ -129,6 +133,8 @@ module soc_top_rv32i #(
     wire io_led         = io_region && (dmem_addr[11:0] == 12'h000);
     wire io_uart_tx     = io_region && (dmem_addr[11:0] == 12'h004);
     wire io_uart_status = io_region && (dmem_addr[11:0] == 12'h008);
+    wire io_seg_data    = io_region && (dmem_addr[11:0] == 12'h00C);
+    wire io_seg_dp      = io_region && (dmem_addr[11:0] == 12'h010);
 
     // -------------------------------------------------------------------------
     // RAM write control
@@ -192,6 +198,40 @@ module soc_top_rv32i #(
     endgenerate
 
     // -------------------------------------------------------------------------
+    // 7-segment registers
+    // -------------------------------------------------------------------------
+
+    reg [31:0] seg_data_reg;
+    reg [7:0]  seg_dp_reg;
+
+    initial begin
+        seg_data_reg = 32'h0000_0000;
+        seg_dp_reg   = 8'h00;
+    end
+
+    wire seg_data_we = io_seg_data && (|dmem_wstrb);
+    wire seg_dp_we   = io_seg_dp && dmem_wstrb[0];
+
+    always @(posedge clk_sys) begin
+        if (reset_active) begin
+            seg_data_reg <= 32'h0000_0000;
+            seg_dp_reg   <= 8'h00;
+        end
+        else begin
+            if (seg_data_we) begin
+                if (dmem_wstrb[0]) seg_data_reg[7:0]   <= dmem_wdata[7:0];
+                if (dmem_wstrb[1]) seg_data_reg[15:8]  <= dmem_wdata[15:8];
+                if (dmem_wstrb[2]) seg_data_reg[23:16] <= dmem_wdata[23:16];
+                if (dmem_wstrb[3]) seg_data_reg[31:24] <= dmem_wdata[31:24];
+            end
+
+            if (seg_dp_we) begin
+                seg_dp_reg <= dmem_wdata[7:0];
+            end
+        end
+    end
+
+    // -------------------------------------------------------------------------
     // UART transmitter
     // -------------------------------------------------------------------------
 
@@ -207,6 +247,21 @@ module soc_top_rv32i #(
         .data  (dmem_wdata[7:0]),
         .busy  (uart_busy),
         .txd   (uart_txd)
+    );
+
+    // -------------------------------------------------------------------------
+    // 7-segment driver
+    // -------------------------------------------------------------------------
+
+    seg7_driver u_seg7 (
+        .clk     (clk_sys),
+        .rst     (reset_active),
+        .data    (seg_data_reg),
+        .dp      (seg_dp_reg),
+        .d0_an   (d0_an),
+        .d0_seg  (d0_seg),
+        .d1_an   (d1_an),
+        .d1_seg  (d1_seg)
     );
 
     // -------------------------------------------------------------------------
@@ -226,6 +281,12 @@ module soc_top_rv32i #(
         end
         else if (io_uart_status) begin
             dmem_rdata_i = {31'b0, uart_busy};
+        end
+        else if (io_seg_data) begin
+            dmem_rdata_i = seg_data_reg;
+        end
+        else if (io_seg_dp) begin
+            dmem_rdata_i = {24'h000000, seg_dp_reg};
         end
         else begin
             dmem_rdata_i = 32'h0000_0000;
