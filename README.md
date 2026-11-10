@@ -116,3 +116,24 @@ firmware/mathdisp.c sweeps an angle around the full circle in 15 degree steps an
 Verification: tools/check_mathdisp.py runs the same code on the host and checks all 48 screens (digits, sign dot and value within 0.001) against Python's math library. On the board the UART output matches. The image is the same SoC as the multiplier build, so timing is unchanged at 75 MHz: WNS 1.275 ns, WHS 0.082 ns, no failing endpoints.
 
 [Video of the sweep on the board](docs/media/mathdisp_sweep.mp4)
+
+## Cycle-accurate CPI model, verified on silicon
+
+`firmware/cpi.c` times six inline-asm microbenchmarks with exactly known
+instruction counts per iteration using the MMIO cycle counter (0x10000014).
+Predicted vs measured cycles per iteration for the 4-stage pipeline: taken
+branch = 1 bubble, load-use = 1 stall, all other cases CPI 1.0.
+
+| Bench | Instr/iter | Predicted cyc/iter | Measured (sim == board) | CPI |
+|---|---|---|---|---|
+| EMPTY | 2 | 3 | 12295 | 1.501 |
+| ADD4 | 6 | 7 | 28682 | 1.167 |
+| LW4 | 6 | 7 | 28681 | 1.167 |
+| SW4 | 6 | 7 | 28682 | 1.167 |
+| NOTAKEN | 6 | 7 | 28681 | 1.167 |
+| LOADUSE | 6 | 9 | 36875 | 1.500 |
+
+Verification: `tools/run_cpi.sh` (sim gate against the theory table in
+`tools/check_cpi.py`), then on the Urbana board `tools/check_cpi.py --log
+build/cpi/hw.log --compare build/cpi/sim.log` reports the sim and board cycle
+counts identical. Timing for this image: WNS +1.275 ns at 75 MHz.
