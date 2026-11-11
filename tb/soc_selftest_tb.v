@@ -26,6 +26,7 @@ module soc_selftest_tb;
         .clk_100mhz (clk),
         .rst_btn    (rst_btn),
         .led        (led),
+        .uart_rxd   (1'b1),
         .uart_txd   (uart_txd)
     );
 

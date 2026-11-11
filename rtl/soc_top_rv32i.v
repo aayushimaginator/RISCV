@@ -19,6 +19,7 @@ module soc_top_rv32i #(
     input  wire        rst_btn,
     output wire [15:0] led,
     output wire        uart_txd,
+    input  wire        uart_rxd,
     output wire [3:0]  d0_an,
     output wire [7:0]  d0_seg,
     output wire [3:0]  d1_an,
@@ -141,6 +142,7 @@ module soc_top_rv32i #(
     wire io_mul_lo      = io_region && (dmem_addr[11:0] == 12'h028);
     wire io_mul_hi      = io_region && (dmem_addr[11:0] == 12'h02C);
     wire io_mul_status  = io_region && (dmem_addr[11:0] == 12'h030);
+    wire io_uart_rx     = io_region && (dmem_addr[11:0] == 12'h034);
 
     // -------------------------------------------------------------------------
     // RAM write control
@@ -256,6 +258,54 @@ module soc_top_rv32i #(
     );
 
     // -------------------------------------------------------------------------
+    // UART receiver + MMIO latch (0x10000034)
+    //   read : {22'b0, overrun, valid, data[7:0]}
+    //   write: any value with wstrb[0] clears valid and overrun (read has no
+    //          side effect, so stalls or re-reads cannot lose a byte)
+    // -------------------------------------------------------------------------
+
+    wire       rx_pulse;
+    wire       rx_ferr;
+    wire [7:0] rx_byte;
+
+    uart_rx #(
+        .DIVISOR (UART_DIVISOR)
+    ) u_uart_rx (
+        .clk       (clk_sys),
+        .reset     (reset_active),
+        .rxd       (uart_rxd),
+        .valid     (rx_pulse),
+        .frame_err (rx_ferr),
+        .data      (rx_byte)
+    );
+
+    reg       rx_valid;
+    reg       rx_overrun;
+    reg [7:0] rx_data;
+
+    initial begin
+        rx_valid   = 1'b0;
+        rx_overrun = 1'b0;
+        rx_data    = 8'h00;
+    end
+
+    always @(posedge clk_sys) begin
+        if (reset_active) begin
+            rx_valid   <= 1'b0;
+            rx_overrun <= 1'b0;
+        end
+        else if (rx_pulse) begin
+            rx_data    <= rx_byte;
+            rx_valid   <= 1'b1;
+            if (rx_valid) rx_overrun <= 1'b1;
+        end
+        else if (io_uart_rx && dmem_wstrb[0]) begin
+            rx_valid   <= 1'b0;
+            rx_overrun <= 1'b0;
+        end
+    end
+
+    // -------------------------------------------------------------------------
     // 7-segment driver
     // -------------------------------------------------------------------------
 
@@ -319,6 +369,9 @@ module soc_top_rv32i #(
         end
         else if (io_uart_status) begin
             dmem_rdata_i = {31'b0, uart_busy};
+        end
+        else if (io_uart_rx) begin
+            dmem_rdata_i = {22'b0, rx_overrun, rx_valid, rx_data};
         end
         else if (io_seg_data) begin
             dmem_rdata_i = seg_data_reg;

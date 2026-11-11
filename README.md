@@ -150,3 +150,15 @@ Verified on the Urbana board: UART prints `ALL LEDS ON` and all 16 LEDs lit.
 The netlist is identical to the CPI image (only the RAM init content differs,
 which does not affect logic timing), so post-route timing is unchanged; the
 snapshot is in `docs/reports/allleds/`.
+
+## Interactive calculator: UART receive, verified on silicon
+
+`rtl/uart_rx.v` (8N1, mid-bit sampling) feeds an MMIO latch at 0x10000034: read gives `{overrun, valid, data[7:0]}`, any write acknowledges. Reads have no side effects, so a replayed load cannot lose a byte. The RX pin is B16.
+
+`firmware/calc.c` takes an angle typed over UART, computes cos and sin with the Q16.16 CORDIC (no multiply instruction, no libgcc) and prints both. The 8-digit display alternates between them until the next key.
+
+Verification: unit TB for the receiver (including a glitch and a bad stop bit), a SoC TB that types into the RX pin, and `tools/run_calc.sh`, which checks the C logic against Python's math library, rejects any multiply or divide in the binary, and runs the firmware on the full SoC in simulation. Known limit: the 1-byte latch can overrun if bytes arrive while a result is printing.
+
+Timing at 75 MHz: WNS_HERE
+
+[Video on the board](docs/media/calc_rx.mp4)
