@@ -122,7 +122,7 @@ Verification: tools/check_mathdisp.py runs the same code on the host and checks 
 `firmware/cpi.c` times six inline-asm microbenchmarks with exactly known
 instruction counts per iteration using the MMIO cycle counter (0x10000014).
 Predicted vs measured cycles per iteration for the 4-stage pipeline: taken
-branch = 1 bubble, load-use = 1 stall, all other cases CPI 1.0.
+branch = 1 bubble, load-use = 1 stall. Every loop includes one taken closing branch, so the floor here is (I+1)/I, not 1.0; straight-line code is CPI 1.0.
 
 | Bench | Instr/iter | Predicted cyc/iter | Measured (sim == board) | CPI |
 |---|---|---|---|---|

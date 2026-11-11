@@ -11,7 +11,7 @@ THEORY = {
     "NOTAKEN": (6, 7),
     "LOADUSE": (6, 9),
 }
-TOL = 64
+TOL = 16
 
 def parse(path):
     out = {}
