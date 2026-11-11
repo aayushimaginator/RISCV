@@ -159,6 +159,6 @@ snapshot is in `docs/reports/allleds/`.
 
 Verification: unit TB for the receiver (including a glitch and a bad stop bit), a SoC TB that types into the RX pin, and `tools/run_calc.sh`, which checks the C logic against Python's math library, rejects any multiply or divide in the binary, and runs the firmware on the full SoC in simulation. Known limit: the 1-byte latch can overrun if bytes arrive while a result is printing.
 
-Timing at 75 MHz: WNS_HERE
+Timing at 75 MHz: WNS 1.761 ns, WHS 0.074 ns, no failing endpoints.
 
 [Video on the board](docs/media/calc_rx.mp4)
