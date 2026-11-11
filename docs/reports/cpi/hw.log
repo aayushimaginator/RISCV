@@ -1,0 +1,9 @@
+=== RV32I CPI microbenchmarks ===
+CPI EMPTY n=4096 cycles=12295
+CPI ADD4 n=4096 cycles=28682
+CPI LW4 n=4096 cycles=28681
+CPI SW4 n=4096 cycles=28682
+CPI NOTAKEN n=4096 cycles=28681
+CPI LOADUSE n=4096 cycles=36875
+CPI DONE
+ALL PASS
