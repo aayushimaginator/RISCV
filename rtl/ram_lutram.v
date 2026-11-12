@@ -14,13 +14,13 @@ module ram_lutram #(
     output wire [31:0] r1_data
 );
 
-    localparam DEPTH_WORDS = 2048;
+    localparam DEPTH_WORDS = 4096;
 
     (* ram_style = "distributed" *)
     reg [31:0] mem [0:DEPTH_WORDS-1];
 
-    wire [10:0] a0 = addr[12:2];
-    wire [10:0] a1 = r1_addr[12:2];
+    wire [11:0] a0 = addr[13:2];
+    wire [11:0] a1 = r1_addr[13:2];
 
     integer i;
 

@@ -123,9 +123,9 @@ module soc_top_rv32i #(
     // Memory region decode
     // -------------------------------------------------------------------------
 
-    // RAM region: byte addresses 0x0000 to 0x1FFF
+    // RAM region: byte addresses 0x0000 to 0x3FFF
     // Word address bits [31:13] must be 0.
-    wire ram_region = (dmem_addr[31:13] == 19'h00000);
+    wire ram_region = (dmem_addr[31:14] == 18'h00000);
 
     // IO region: high nibble is 0x1
     wire io_region  = (dmem_addr[31:28] == 4'h1);
