@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Hand-assembled RX register test program (no compiler needed). Writes a hex image.
-Behaviour: poll 0x10000034; on valid, ack (write 0) and show byte on LED.
-On byte 0x7E: busy-wait ~16k cycles (so TB can overrun the latch), then show the raw
-RX register (valid|overrun|data) on the LEDs and halt."""
+Behaviour: poll 0x10000034; on valid, ack (write 0 = pop) and show byte on LED.
+On byte 0x7E: busy-wait ~16k cycles (so the TB can fill the FIFO), show the raw RX
+register (overrun|valid|head) on the LEDs, then drain: pop every byte and show it."""
 import sys
 
 def r_(n): return n & 31
@@ -39,8 +39,14 @@ I(addi(5, 5, -1))
 I(lambda pc: br(1, 5, 0, labels["delay"] - pc))      # bne x5,x0,delay
 I(lw(2, 1, 0x34))
 I(sw(2, 1, 0))                                       # LED = raw register
-L("halt")
-I(lambda pc: jal(0, labels["halt"] - pc))
+L("drain")
+I(lw(2, 1, 0x34))
+I(andi(3, 2, 0x100))
+I(lambda pc: br(0, 3, 0, labels["drain"] - pc))      # beq x3,x0,drain
+I(sw(0, 1, 0x34))                                    # pop
+I(andi(2, 2, 0xFF))
+I(sw(2, 1, 0))                                       # LED = byte
+I(lambda pc: jal(0, labels["drain"] - pc))
 
 words = [f(i * 4) if callable(f) else f for i, f in enumerate(prog)]
 words += [0] * (2048 - len(words))

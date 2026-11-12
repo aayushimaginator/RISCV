@@ -157,7 +157,7 @@ snapshot is in `docs/reports/allleds/`.
 
 `firmware/calc.c` takes an angle typed over UART, computes cos and sin with the Q16.16 CORDIC (no multiply instruction, no libgcc) and prints both. The 8-digit display alternates between them until the next key.
 
-Verification: unit TB for the receiver (including a glitch and a bad stop bit), a SoC TB that types into the RX pin, and `tools/run_calc.sh`, which checks the C logic against Python's math library, rejects any multiply or divide in the binary, and runs the firmware on the full SoC in simulation. Known limit: the 1-byte latch can overrun if bytes arrive while a result is printing.
+Verification: unit TB for the receiver (including a glitch and a bad stop bit), a SoC TB that types into the RX pin, and `tools/run_calc.sh`, which checks the C logic against Python's math library, rejects any multiply or divide in the binary, and runs the firmware on the full SoC in simulation. The receiver feeds a 16-byte FIFO: pasting several lines while results are still printing is safe, and a byte arriving with the FIFO full is dropped and sets a sticky overrun flag. Verified in simulation (a paste test that fails on the old 1-byte latch) and on the board. Timing at 75 MHz with the FIFO: WNS 2.123 ns, WHS 0.060 ns, no failing endpoints.
 
 Timing at 75 MHz: WNS 1.761 ns, WHS 0.074 ns, no failing endpoints.
 

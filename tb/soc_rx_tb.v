@@ -16,7 +16,10 @@ module soc_rx_tb;
         .uart_rxd(rxd), .uart_txd(uart_txd));
     always #5 clk = ~clk;
 
-    integer fails = 0;
+    integer fails = 0, n, nlog = 0;
+    reg [15:0] exp_b;
+    reg [15:0] ledlog [0:63];
+    always @(led) begin ledlog[nlog] = led; nlog = nlog + 1; end
 
     task send(input [7:0] b);
         integer i;
@@ -54,17 +57,28 @@ module soc_rx_tb;
         send(8'h41); expect_led(16'h0041, "byte A"); expect_cleared("after A");
         send(8'h42); expect_led(16'h0042, "byte B"); expect_cleared("after B");
         send(8'hFF); expect_led(16'h00FF, "byte FF"); expect_cleared("after FF");
-        // 0x7E makes the firmware stall; the next two bytes must overrun the latch
+        // 0x7E makes the firmware stall while 20 more bytes arrive: the 16-byte FIFO
+        // keeps the first 16, drops the last 4 and flags overrun.
         send(8'h7E);
         repeat (64) @(posedge clk);
-        send(8'h11);
-        send(8'h22);
+        send(8'h11); send(8'h22);
+        for (n = 0; n < 18; n = n + 1) send(8'h30 + n);
         repeat (BIT_CYCLES * 2) @(posedge clk);
-        // firmware finishes its delay and shows raw reg: overrun|valid|last byte
-        repeat (200000) @(posedge clk);
-        if (led !== 16'h0322) begin
-            $display("FAIL overrun: led=%h expected 0322", led); fails = fails + 1;
+        if (dut.rx_count !== 5'd16 || dut.rx_overrun !== 1'b1) begin
+            $display("FAIL fifo state: count=%0d overrun=%b (want 16, 1)", dut.rx_count, dut.rx_overrun);
+            fails = fails + 1;
         end
+        repeat (200000) @(posedge clk);
+        // log: ... 7E, raw 0311, then 16 drained bytes in arrival order, then nothing
+        if (nlog < 18) begin $display("FAIL led log too short: %0d", nlog); fails = fails + 1; end
+        if (ledlog[nlog-17] !== 16'h0311) begin $display("FAIL raw register %h, want 0311", ledlog[nlog-17]); fails = fails + 1; end
+        for (n = 0; n < 16; n = n + 1) begin
+            exp_b = (n == 0) ? 16'h0011 : (n == 1) ? 16'h0022 : (16'h0030 + n - 2);
+            if (ledlog[nlog-16+n] !== exp_b) begin
+                $display("FAIL drain[%0d]=%h want %h", n, ledlog[nlog-16+n], exp_b); fails = fails + 1;
+            end
+        end
+        if (dut.rx_count !== 5'd0) begin $display("FAIL fifo not empty after drain"); fails = fails + 1; end
         if (fails == 0) $display("SOC RX SIM PASS"); else $display("SOC RX SIM FAIL");
         $finish;
     end

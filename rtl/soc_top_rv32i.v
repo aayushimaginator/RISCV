@@ -258,10 +258,12 @@ module soc_top_rv32i #(
     );
 
     // -------------------------------------------------------------------------
-    // UART receiver + MMIO latch (0x10000034)
-    //   read : {22'b0, overrun, valid, data[7:0]}
-    //   write: any value with wstrb[0] clears valid and overrun (read has no
-    //          side effect, so stalls or re-reads cannot lose a byte)
+    // UART receiver + 16-byte FIFO (0x10000034)
+    //   read : {22'b0, overrun, valid, head[7:0]}   (valid = FIFO not empty)
+    //   write: any value with wstrb[0] pops the head and clears overrun.
+    //          Reads have no side effect, so stalls or re-reads cannot lose a
+    //          byte. A byte arriving while the FIFO is full is dropped and
+    //          sets overrun (sticky until the next write).
     // -------------------------------------------------------------------------
 
     wire       rx_pulse;
@@ -279,29 +281,44 @@ module soc_top_rv32i #(
         .data      (rx_byte)
     );
 
-    reg       rx_valid;
+    reg [7:0] rx_mem [0:15];
+    reg [3:0] rx_wp;
+    reg [3:0] rx_rp;
+    reg [4:0] rx_count;
     reg       rx_overrun;
-    reg [7:0] rx_data;
+
+    wire       rx_valid = (rx_count != 5'd0);
+    wire       rx_full  = (rx_count == 5'd16);
+    wire [7:0] rx_data  = rx_valid ? rx_mem[rx_rp] : 8'h00;
+    wire       rx_pop   = io_uart_rx && dmem_wstrb[0] && rx_valid;
+    wire       rx_push  = rx_pulse && (!rx_full || rx_pop);
 
     initial begin
-        rx_valid   = 1'b0;
+        rx_wp      = 4'd0;
+        rx_rp      = 4'd0;
+        rx_count   = 5'd0;
         rx_overrun = 1'b0;
-        rx_data    = 8'h00;
     end
 
     always @(posedge clk_sys) begin
         if (reset_active) begin
-            rx_valid   <= 1'b0;
+            rx_wp      <= 4'd0;
+            rx_rp      <= 4'd0;
+            rx_count   <= 5'd0;
             rx_overrun <= 1'b0;
         end
-        else if (rx_pulse) begin
-            rx_data    <= rx_byte;
-            rx_valid   <= 1'b1;
-            if (rx_valid) rx_overrun <= 1'b1;
-        end
-        else if (io_uart_rx && dmem_wstrb[0]) begin
-            rx_valid   <= 1'b0;
-            rx_overrun <= 1'b0;
+        else begin
+            if (io_uart_rx && dmem_wstrb[0])
+                rx_overrun <= 1'b0;
+            if (rx_push) begin
+                rx_mem[rx_wp] <= rx_byte;
+                rx_wp         <= rx_wp + 4'd1;
+            end
+            else if (rx_pulse)
+                rx_overrun <= 1'b1;
+            if (rx_pop)
+                rx_rp <= rx_rp + 4'd1;
+            rx_count <= rx_count + {4'b0, rx_push} - {4'b0, rx_pop};
         end
     end
 

@@ -53,6 +53,16 @@ module soc_calc_tb;
         end
     endtask
 
+    // back-to-back bytes, no gap: a terminal paste
+    task burst(input [7:0] b);
+        integer i;
+        begin
+            rxd = 0; repeat (BIT_CYCLES) @(posedge clk);
+            for (i = 0; i < 8; i = i + 1) begin rxd = b[i]; repeat (BIT_CYCLES) @(posedge clk); end
+            rxd = 1; repeat (BIT_CYCLES) @(posedge clk);
+        end
+    endtask
+
     task type3(input [7:0] a, input [7:0] b, input [7:0] c);
         begin send(a); send(b); send(c); send(8'h0D); end
     endtask
@@ -96,6 +106,14 @@ module soc_calc_tb;
         has("cos 046 = +0.695", 16);
         has("sin 046 = +0.719", 16);
         if (led !== 16'd46) begin $display("\nFAIL led=%0d expected 46", led); fails = fails + 1; end
+        // paste two whole lines at full line rate while results are still printing
+        burst("9"); burst("0"); burst(8'h0D); burst("1"); burst("8"); burst("0"); burst(8'h0D);
+        wait (prompts == 6);
+        repeat (2000) @(posedge clk);
+        has("cos 090 = +0.000", 16);
+        has("sin 090 = +1.000", 16);
+        has("cos 180 = -1.000", 16);
+        has("sin 180 = +0.000", 16);
         $display("");
         if (fails == 0) $display("SOC CALC SIM PASS"); else $display("SOC CALC SIM FAIL");
         $finish;
