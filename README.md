@@ -1,130 +1,80 @@
-# Urbana implementation of RV32I
+# RV32I on the RealDigital Urbana
 
-RV32I CPU project on the RealDigital Urbana (Spartan-7 XC7S50, speed grade -2), for an MPMC course.
+A from-scratch RV32I CPU (4-stage pipeline) on the RealDigital Urbana board (Spartan-7 XC7S50-CSGA324), running at 75 MHz, with a small SoC around it: UART TX and RX (with a FIFO), 16 LEDs, an 8-digit seven-segment display, a cycle counter and a DSP48 multiplier. Built for an MPMC course project.
+
+Everything below that says "board" was run on a real Urbana. Everything that says "simulation" was not. The board was returned to the lab at the end of the project, so a few late items are simulation-only; they are marked.
 
 ## Status
-- Phase 0: SoC around unmodified PicoRV32 (UART + 16 LEDs). Simulation PASS, Vivado timing met at 100 MHz. **Board test: verified on Urbana (UART greeting + LED sweep).**
-- Phase 1: own single-cycle RV32I core, in progress (ALU and branch comparator first).
 
-## Phase 0 results (Vivado 2024.2, post-implementation, 100 MHz)
-| Metric | Value |
+| Item | Simulation | Board |
+|---|---|---|
+| PicoRV32 control SoC (Phase 0) | pass | pass (`Hello, RV32I!`, LED sweep) |
+| Own 4-stage core, 75 MHz | pass (units, 200 random programs vs ISS, riscv-tests rv32ui 40/40) | pass (same firmware, about 2.8x faster than the PicoRV32 control) |
+| 55-check known-answer self-test | pass | pass |
+| Seven-segment display | pass | pass |
+| Cycle counter + hardware multiplier (12.7x) | pass | pass |
+| cos/sin calculator readout (CORDIC) | pass | pass |
+| CPI microbenchmarks | pass | pass, cycle counts identical to simulation |
+| UART receive + 16-byte FIFO, interactive calculator | pass | pass, including pasting several lines at once |
+| 16 KB RAM (was 8 KB) | pass, timing met | not run on the board |
+| CoreMark port | CRCs match a native build | not run on the board, **no score claimed** |
+
+## Architecture
+
+- **Core:** RV32I, 4 stages (IF | EX | MEM | WB). Load-use costs 1 stall cycle, a taken branch or jump costs 1 bubble. Forwarding between stages (load data is registered at the end of MEM and forwarded from the WB register, which keeps the data-RAM read out of the branch path). No multiply instruction (RV32I only).
+- **Clock:** 100 MHz pin, MMCM to 75 MHz. Post-route slack in the table below; an attempt at 100 MHz missed by 0.076 ns and was not pursued.
+- **Memory:** 16 KB LUTRAM, 0x0000 to 0x3FFF, two async read ports (instruction and data). Existing 8 KB images still run unchanged.
+
+| Address | Register |
 |---|---|
-| Slice LUTs | 2060 (6.3%) |
-| LUT as Memory | 1068 |
-| Slice registers | 615 |
-| WNS / WHS | +2.102 ns / +0.101 ns |
+| 0x0000_0000 to 0x0000_3FFF | RAM (16 KB) |
+| 0x1000_0000 | LED (16 bits) |
+| 0x1000_0004 | UART TX data |
+| 0x1000_0008 | UART status (bit 0 = TX busy) |
+| 0x1000_000C | SEG_DATA, 8 hex nibbles (nibble 0 = rightmost digit) |
+| 0x1000_0010 | SEG_DP, decimal-point mask |
+| 0x1000_0014 | cycle counter (free-running, 32 bit) |
+| 0x1000_0020 / 24 | multiplier operands A / B |
+| 0x1000_0028 / 2C | multiplier result LO / HI |
+| 0x1000_0030 | multiplier status (bit 0 = busy) |
+| 0x1000_0034 | UART RX FIFO: read `{overrun, valid, head[7:0]}`, write pops the head and clears overrun |
 
-Reports are in docs/reports/.
+Pins: UART TX A16, UART RX B16, reset button J2, clock N15, seven-segment pins in `constraints/urbana.xdc`.
 
-## Memory map
-- 0x0000_0000 RAM, 8 KB
-- 0x1000_0000 LED register (16 bits)
-- 0x1000_0004 UART TX data
-- 0x1000_0008 UART status (bit 0 = busy)
+## Results (Vivado 2024.2, post-implementation, 75 MHz unless noted)
 
-## Build
-    git clone --recursive https://github.com/aayushimaginator/RISCV.git
-    make -C firmware DELAY_N=20
-    iverilog -o soc_tb.vvp tb/soc_tb.v rtl/soc_top.v rtl/ram_lutram.v rtl/uart_tx.v third_party/picorv32/picorv32.v
-    vvp soc_tb.vvp
-    make -C firmware clean && make -C firmware
-    vivado -mode batch -source build.tcl
+| Build | WNS | WHS | Notes |
+|---|---|---|---|
+| PicoRV32 control, 100 MHz | +2.102 ns | +0.101 ns | 2060 LUTs |
+| Own 2-stage core, 50 MHz | +2.163 ns | +0.090 ns | real Fmax about 56 MHz; never run on the board |
+| Own 4-stage core, hello image | +1.427 ns | +0.048 ns | est. Fmax about 84 MHz, CPI about 1.08 on rv32ui |
+| Calculator + RX FIFO image (8 KB RAM) | +2.123 ns | +0.060 ns | 20,895 endpoints, none failing |
+| 16 KB RAM image | +2.098 ns | +0.068 ns | 6,272 LUTs (19%), 4,146 of them as memory, 0 BRAM |
 
-## Tools
-Code was generated with LLM assistance (Qwen for generation, Claude for review). All results above come from tools run locally.
+Reports are in `docs/reports/`. The single-cycle core failed 100 MHz (WNS -7.07 ns), which is why the project moved to a pipelined design. An early commit claimed 100 MHz from a constraint on the wrong clock; that was wrong and is corrected in the history.
 
-## License
-MIT for this repo's own code. third_party/picorv32 is ISC (YosysHQ).
+## Verified on the board
 
-## Phase 1: own 2-stage RV32I core (50 MHz)
-
-| Item | Result |
-|---|---|
-| Clock | 100 MHz pin -> MMCM -> 50 MHz system clock (20 ns) |
-| Setup / hold slack | WNS +2.163 ns / WHS +0.090 ns (post-route, Vivado 2024.2) |
-| Critical path | 17.6 ns: data-RAM read -> LSU -> forwarding -> branch compare -> next PC |
-| Real Fmax | about 56 MHz (not 100 MHz) |
-| Verification | 7 unit tests; 50/50 random programs match a Python ISS; SoC sim PASS |
-| Board test | superseded by Phase 2 (never run on hardware) |
-
-History: the single-cycle core failed 100 MHz (WNS -7.07 ns). The 2-stage version keeps
-branch resolution and forwarding in one stage, so the critical path is not shorter. An
-earlier commit claimed 100 MHz from a 20 ns constraint on a 100 MHz pin; that was wrong
-and is corrected here with a real MMCM-derived clock.
-Code was written with LLM assistance and independently verified.
-
-### Compliance
-- riscv-tests rv32ui: 40/40 pass (minimal ECALL-terminated env in `tests/rvtest_env`; `fence_i` and `ma_data` skipped as out of scope). Each result also agrees with the Python ISS.
-- CPI on that suite: about 1.07 (short tests, includes pipeline fill).
-- Run: `tools/run_riscv_tests.sh`
-
-## Phase 2: 4-stage core (IF | EX | MEM | WB), 75 MHz
-
-| Item | Result |
-|---|---|
-| Clock | 100 MHz pin -> MMCM -> 75 MHz system clock (13.33 ns) |
-| Setup / hold slack | WNS +1.427 ns / WHS +0.048 ns (post-route, Vivado 2024.2) |
-| Critical path | 11.9 ns: instruction reg -> decode/immgen -> ALU adder (JALR target) -> next PC |
-| Estimated Fmax | about 84 MHz |
-| Verification | unit tests; 200/200 random programs vs ISS; riscv-tests rv32ui 40/40; SoC sim PASS |
-| CPI | about 1.08 on rv32ui (short tests, includes pipeline fill) |
-| Board test | **verified on Urbana**: bitstream at 75 MHz prints `Hello, RV32I!` on UART and runs the LED sweep, about 2.8x faster than the PicoRV32 control on the same firmware |
-
-Change from Phase 1: load data is registered at the end of MEM and forwarded from the WB
-register, so the data-RAM read no longer sits in the branch-resolve path. One stall cycle on
-load-use. UART divisor 651 for 75 MHz is not exercised by the simulation (the testbench
-overrides it and uses a /2 clock), so it is only verified by arithmetic until the board test.
-
-### Hardware bring-up notes (Urbana)
-- One micro-USB cable into `PROG UART USB PWR` (J13) powers, programs and carries the UART (FT2232H, UART on the second ttyUSB, 115200 8N1). The USB-C port is external power only.
-- Jumper `PWR SEL` on `USB`, power switch `SW16` on `ON`; all four POWER SUPPLY STATUS LEDs light.
-- Control experiment first: PicoRV32 bitstream (`scripts/program.tcl`), then own core (`-tclargs <bitstream>`). Same firmware, same expected output.
-
-## On-board known-answer self-test
-
-`firmware/selftest.c` runs 55 checks on the 4-stage core at 75 MHz and prints each result over UART. The expected values are computed independently in Python (`tools/check_selftest.py`, using zlib for CRC32), not by the firmware itself.
-
-Coverage: CRC-32 (bitwise), Fibonacci (iterative and recursive), bubble sort, add/sub wraparound, all shift forms, XOR/OR/AND, signed and unsigned compares, all branch types, lb/lbu/lh/lhu/sb/sh with sign extension and partial-word writes, and indirect calls through a function-pointer table (jalr). Instructions the compiler would otherwise rewrite (lb, lh, blt, bge, slti, sltiu) are forced with inline asm so they really execute.
-
-Result on the Urbana board: all 55 checks PASS and the LEDs show 0xAAAA. The same image also passes in simulation (`tools/run_selftest.sh`). Timing for this bitstream: WNS +1.427 ns, WHS +0.048 ns, 0 failing endpoints.
+**55-check self-test** (`firmware/selftest.c`). CRC-32, Fibonacci, bubble sort, all shift and compare forms, every branch type, lb/lbu/lh/lhu/sb/sh with sign extension, indirect calls through a function-pointer table. Expected values come from Python (`tools/check_selftest.py`), not from the firmware. Result: all 55 PASS, LEDs 0xAAAA. Instructions the compiler would rewrite are forced with inline asm so they really execute.
 
 ![UART output](docs/media/selftest_uart.png)
 ![LEDs 0xAAAA](docs/media/selftest_leds.jpg)
 
-## Seven-segment display peripheral
-
-`rtl/seg7_driver.v` drives the Urbana's two 4-digit common-anode displays (8 digits, all signals active low). Two registers are memory-mapped: `SEG_DATA` at `0x1000000C` (8 hex nibbles, nibble 0 is the rightmost digit) and `SEG_DP` at `0x10000010` (decimal-point mask). The two displays have separate cathode buses, so the driver lights one digit on each display at the same time in four phases, about 1 kHz per frame, with an idle clock between phases to prevent ghosting.
-
-Verification: a unit testbench (`tb/seg7_tb.v`), an SoC-level test where the real CPU writes the register and a testbench decodes the pins like a display would (`tb/soc_seg_tb.v`), and the board. Run `tools/run_seg7.sh` for the simulation gates.
-
-On the board, firmware writes `0xCBF43926`, the CRC-32 of `123456789`, and the displays read `CbF4.3926`, with the decimal point after digit 4. Timing for this bitstream: WNS +2.113 ns, WHS +0.077 ns, 0 failing endpoints at 75 MHz. The physical digit order was found on hardware: the first build showed the digits reversed, and the digit map was reversed to fix it.
+**Seven-segment display** (`rtl/seg7_driver.v`). Two common-anode 4-digit displays, one digit per display lit at a time in four phases (about 1 kHz frame) with an idle clock between phases to prevent ghosting. Firmware writes 0xCBF43926 (the CRC-32 of `123456789`) and the display reads `CbF4.3926`. The first build showed the digits reversed; the digit map was fixed on hardware.
 
 ![Display showing CbF4.3926](docs/media/seg7_crc.jpg)
 
-## Cycle counter and hardware multiplier
+**Cycle counter and DSP48 multiplier** (`rtl/mul32.v`, `firmware/mulbench.c`). Two-stage pipeline of four 16x16 products, not an ISA extension. 100 multiplies take 26,904 cycles in software and 2,111 through the peripheral: 12.7x, shown on the display as `0000012.7`.
 
-The SoC has a free-running 32-bit cycle counter at 0x10000014 and a memory-mapped multiplier (rtl/mul32.v) at 0x10000020 to 0x10000030: operands A and B, 64-bit result LO and HI, and a busy flag. RV32I has no multiply instruction, so software multiplies use a shift-and-add loop. The multiplier is a two-stage pipeline of four 16x16 products that Vivado maps onto DSP48 slices, and it is not an ISA extension, so the CPU pipeline is untouched.
+![Display showing 12.7x](docs/media/mulbench_speedup.jpg)
 
-firmware/mulbench.c first checks 12 known-answer products against values computed in Python, then times 100 multiplies in software against 100 through the peripheral, using the cycle counter. Measured in simulation of the same image: 26904 cycles in software against 2111 through the peripheral, a speedup of 12.7x. On the board the display shows the speedup times 10 as 0000012.7. Timing for this bitstream at 75 MHz: WNS 1.275 ns, WHS 0.082 ns, no failing endpoints.
+**cos/sin on the display** (`firmware/mathdisp.c`). Q16.16 CORDIC with no multiplier. The display shows function (C or 5), angle, value, for example `C135 0.707`. The font has no minus sign, so a negative value lights the decimal point after the angle. `tools/check_mathdisp.py` checks all 48 screens against Python's math library.
 
-![Display showing 12.7x speedup](docs/media/mulbench_speedup.jpg)
+[Video](docs/media/mathdisp_sweep.mp4)
 
-## Calculator readout: cos and sin on the display
+**CPI microbenchmarks** (`firmware/cpi.c`). Six inline-asm loops with exactly known instruction counts, timed with the cycle counter. Every loop includes one taken closing branch, so the floor is (I+1)/I rather than 1.0.
 
-firmware/mathdisp.c sweeps an angle around the full circle in 15 degree steps and shows cos and sin on the eight-digit display, calculator style: the leftmost digit is the function (C for cos, 5 for sin), then the angle, then the value, for example C135 0.707. The display font has no minus sign, so a negative value also lights the decimal point after the angle. The values come from CORDIC in fixed point (shifts, adds and a small table, no multiplier) and are also printed over UART.
-
-Verification: tools/check_mathdisp.py runs the same code on the host and checks all 48 screens (digits, sign dot and value within 0.001) against Python's math library. On the board the UART output matches. The image is the same SoC as the multiplier build, so timing is unchanged at 75 MHz: WNS 1.275 ns, WHS 0.082 ns, no failing endpoints.
-
-[Video of the sweep on the board](docs/media/mathdisp_sweep.mp4)
-
-## Cycle-accurate CPI model, verified on silicon
-
-`firmware/cpi.c` times six inline-asm microbenchmarks with exactly known
-instruction counts per iteration using the MMIO cycle counter (0x10000014).
-Predicted vs measured cycles per iteration for the 4-stage pipeline: taken
-branch = 1 bubble, load-use = 1 stall. Every loop includes one taken closing branch, so the floor here is (I+1)/I, not 1.0; straight-line code is CPI 1.0.
-
-| Bench | Instr/iter | Predicted cyc/iter | Measured (sim == board) | CPI |
+| Bench | Instr/iter | Predicted cyc/iter | Measured (sim = board) | CPI |
 |---|---|---|---|---|
 | EMPTY | 2 | 3 | 12295 | 1.501 |
 | ADD4 | 6 | 7 | 28682 | 1.167 |
@@ -133,32 +83,61 @@ branch = 1 bubble, load-use = 1 stall. Every loop includes one taken closing bra
 | NOTAKEN | 6 | 7 | 28681 | 1.167 |
 | LOADUSE | 6 | 9 | 36875 | 1.500 |
 
-Verification: `tools/run_cpi.sh` (sim gate against the theory table in
-`tools/check_cpi.py`), then on the Urbana board `tools/check_cpi.py --log
-build/cpi/hw.log --compare build/cpi/sim.log` reports the sim and board cycle
-counts identical. Timing for this image: WNS +1.275 ns at 75 MHz.
+**Interactive calculator over UART** (`rtl/uart_rx.v`, `firmware/calc.c`). Type an angle and press Enter; the board prints cos and sin and the display alternates between them. The receiver (8N1, mid-bit sampling) feeds a 16-byte FIFO, so pasting several lines while results are still printing is safe; a byte arriving with the FIFO full is dropped and sets a sticky overrun flag. A simulation test that pastes two lines fails on the older 1-byte latch.
 
-## All-LEDs sanity image
+[Video](docs/media/calc_rx.mp4)
 
-`firmware/allleds.c` writes `0xFFFF` to the LED register to drive all 16 LEDs
-solid on, complementing the `0xAAAA` alternating beacon used by the self-test
-and CPI images (which only proved alternating bits). It is a hardware-only
-peripheral sanity check and deliberately has no simulation gate: the shared SoC
-testbench `tb/soc_selftest_tb.v` keys its PASS condition on the `0xAAAA` beacon,
-so a full-on pattern would report TIMEOUT there without indicating a fault.
-Verified on the Urbana board: UART prints `ALL LEDS ON` and all 16 LEDs lit.
-The netlist is identical to the CPI image (only the RAM init content differs,
-which does not affect logic timing), so post-route timing is unchanged; the
-snapshot is in `docs/reports/allleds/`.
+An all-LEDs image (`firmware/allleds.c`, 0xFFFF) was also verified on the board; it has no simulation gate by design.
 
-## Interactive calculator: UART receive, verified on silicon
+## CoreMark: simulation only
 
-`rtl/uart_rx.v` (8N1, mid-bit sampling) feeds an MMIO latch at 0x10000034: read gives `{overrun, valid, data[7:0]}`, any write acknowledges. Reads have no side effects, so a replayed load cannot lose a byte. The RX pin is B16.
+`firmware/cm_port/` ports EEMBC CoreMark (sources unmodified in `third_party/coremark/`, pinned commit in `VERSION`, EEMBC's licence file included). Run it with `tools/run_coremark.sh`.
 
-`firmware/calc.c` takes an angle typed over UART, computes cos and sin with the Q16.16 CORDIC (no multiply instruction, no libgcc) and prints both. The 8-digit display alternates between them until the next key.
+- The image fits the 16 KB RAM: 12.9 KB at `-O2`, 10.4 KB at `-Os`. Software multiply and divide come from libgcc.
+- In simulation the CRCs equal what a native host build prints (seedcrc 0xe9f5, list 0xe714, matrix 0x1fd7, state 0x8e3a), so the core executes CoreMark correctly.
+- One iteration takes 918,280 cycles at `-O2` (1,059,708 at `-Os`) in simulation.
+- **This is not a CoreMark score.** EEMBC requires a run of at least 10 seconds, which needs the board, and the board was returned. A 1-iteration run therefore ends with CoreMark's own "ERROR! Must execute for at least 10 secs" and "Errors detected"; the simulation gate checks the CRCs instead. `tools/cm_score.py` refuses to report a number for any run that is too short or has errors.
 
-Verification: unit TB for the receiver (including a glitch and a bad stop bit), a SoC TB that types into the RX pin, and `tools/run_calc.sh`, which checks the C logic against Python's math library, rejects any multiply or divide in the binary, and runs the firmware on the full SoC in simulation. The receiver feeds a 16-byte FIFO: pasting several lines while results are still printing is safe, and a byte arriving with the FIFO full is dropped and sets a sticky overrun flag. Verified in simulation (a paste test that fails on the old 1-byte latch) and on the board. Timing at 75 MHz with the FIFO: WNS 2.123 ns, WHS 0.060 ns, no failing endpoints.
+## Reproduce
 
-Timing at 75 MHz: WNS 1.761 ns, WHS 0.074 ns, no failing endpoints.
+Needs `riscv64-unknown-elf-gcc`, `iverilog`, Python 3. Vivado 2024.2 only for bitstreams.
 
-[Video on the board](docs/media/calc_rx.mp4)
+    git clone --recursive https://github.com/aayushimaginator/RISCV.git
+    cd RISCV
+    bash tools/run_all.sh          # every simulation gate, a few minutes
+    bash tools/run_all.sh --full   # also 50 random programs against the Python ISS
+
+Single gates: `tools/run_unit_tests.sh`, `run_riscv_tests.sh`, `run_selftest.sh`, `run_seg7.sh`, `run_cpi.sh`, `run_mulbench.sh`, `run_mathdemo.sh`, `run_mathdisp.sh`, `run_rxsoc.sh`, `run_calc.sh`, `run_ram16.sh`, `run_coremark.sh`. Each ends with a PASS line and a non-zero exit on failure.
+
+Build and program one firmware image on the board:
+
+    bash tools/build_hw_image.sh NAME firmware/SOURCE.c
+    vivado -mode batch -source scripts/program.tcl -tclargs build/NAME.bit
+    picocom -b 115200 /dev/ttyUSB1
+
+The build script fails closed on Vivado errors, copies the timing and utilization reports to `docs/reports/NAME/`, and restores the default firmware afterwards. Images that need more than 8 KB (the CoreMark port, `firmware/ramtest.c`) are linked with `firmware/link16.ld` and `firmware/start16.S`; `build_hw_image.sh` does not do that yet.
+
+Hardware notes: one micro-USB cable into `PROG UART USB PWR` powers, programs and carries the UART (FT2232H, UART is the second ttyUSB, 115200 8N1). Jumper `PWR SEL` on `USB`, switch `SW16` on.
+
+## Layout
+
+    rtl/            core, decoder, ALU, LSU, RAM, UART TX/RX, seven-segment driver, multiplier, SoC top
+    tb/             unit and SoC testbenches
+    firmware/       test programs and demos; link.ld/start.S (8 KB), link16.ld/start16.S (16 KB), cm_port/ (CoreMark)
+    tools/          run_*.sh gates, checkers, Python ISS, random-program generator, build_hw_image.sh
+    tests/          riscv-tests environment
+    scripts/        Vivado programming script, test-vector generators
+    constraints/    Urbana pin and clock constraints
+    third_party/    picorv32 (control SoC), coremark (EEMBC)
+    docs/           reports (timing/utilization per build) and media
+
+## Not done
+
+- 100 MHz (the 4-stage core misses by 0.076 ns).
+- M extension (multiplies go through the MMIO accelerator, not an instruction).
+- A valid CoreMark run on the board.
+- Block-RAM memory (LUTRAM is at 43% of its budget at 16 KB, so 32 KB is the practical ceiling).
+
+## Provenance and licences
+
+Code was written with LLM assistance (Qwen for generation, Claude for review) and independently verified with the tests above; all results come from tools run locally. This repository's own code is MIT. `third_party/picorv32` is ISC (YosysHQ). `third_party/coremark` is EEMBC CoreMark under its own licence and acceptable-use terms; CoreMark is a trademark of EEMBC.
