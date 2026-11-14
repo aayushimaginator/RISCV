@@ -25,3 +25,5 @@ reports_rv32i/
 vivado_rv32i/
 soc_sim.vvp
 *.docx
+
+!docs/RV32I_4stage_Urbana_report.docx
